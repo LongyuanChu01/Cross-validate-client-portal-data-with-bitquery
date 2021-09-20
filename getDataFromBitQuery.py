@@ -13,6 +13,7 @@ import os
 
 # network = bsc or ethereum
 def getDataFromBitQuery(network, address):
+    print("Start getting " + network + " - " + address)
     query = '''query ($network: EthereumNetwork!,
                               $address: String!,
                               $from: ISO8601DateTime,
@@ -31,7 +32,8 @@ def getDataFromBitQuery(network, address):
     variables = {"network": network, "address": address, "from": startTime, "till": startTime, "dateFormat": "%Y-%m-%d"}
 
     url = 'https://graphql.bitquery.io'
-    r = requests.post(url, json={'query': query, 'variables': variables})
+    r = requests.post(url, json={'query': query, 'variables': variables},
+                      headers={"X-API-KEY": "BQYhqC8VZADnwblLczQMA9GZ6LZbo6Hm"})
     json_data = json.loads(r.text)
     df_data = json_data['data']['ethereum']['smartContractCalls'][0]
     # address, calls count, Uniq Callers
@@ -41,6 +43,7 @@ def getDataFromBitQuery(network, address):
 
 
 def getDataFromSnowFlake(network):
+    print("Start getting data from SnowFlake")
     ctx = snow.connect(
         user=os.environ.get('SNOW_USER'),
         password=os.environ.get('SNOW_PASSWORD'),
@@ -55,10 +58,10 @@ def getDataFromSnowFlake(network):
     try:
         if network == 'ethereum':
             results = cs.execute(
-                "select * from PUBLIC.ETH_TO_ADDR_PRECOMPUTE where DATE=DATEADD(Day ,-1, current_date)  order by TXN_COUNTS desc limit 3;").fetchall()
+                "select * from PUBLIC.ETH_TO_ADDR_PRECOMPUTE where DATE=DATEADD(Day ,-1, current_date)  order by TXN_COUNTS desc limit 5;").fetchall()
         elif network == 'bsc':
             results = cs.execute(
-                "select * from PUBLIC.BSC_TO_ADDR_PRECOMPUTE where DATE=DATEADD(Day ,-1, current_date)  order by TXN_COUNTS desc limit 3;").fetchall()
+                "select * from PUBLIC.BSC_TO_ADDR_PRECOMPUTE where DATE=DATEADD(Day ,-1, current_date)  order by TXN_COUNTS desc limit 5;").fetchall()
     finally:
         cs.close()
     ctx.close()
@@ -74,6 +77,7 @@ def getDataFromSnowFlake(network):
 
 
 def writeIntoSnowFlake(snowFlake, network):
+    print("Start writing data to SnowFlake")
     ctx = snow.connect(
         user=os.environ.get('SNOW_USER'),
         password=os.environ.get('SNOW_PASSWORD'),
@@ -102,6 +106,7 @@ def main():
     # network can be "ethereum" or "bsc"
     networks = ["ethereum", "bsc"]
     for network in networks:
+        print(network)
         snowFlake = getDataFromSnowFlake(network)
 
         snowFlake['temp'] = snowFlake['address'].apply(lambda x: getDataFromBitQuery(network, x))
